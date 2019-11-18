@@ -1,54 +1,72 @@
 <template>
   <div class="select-guest">
-    <button class="select-guest--btn">
+    <!--v-click-outside="close"-->
+    <button class="select-guest--btn" @click="modal = !modal">
       {{ allGuest }} гостя
-      <span class="ico-arrow"></span>
+      <span class="ico-arrow" :class="{'active': modal}"></span>
     </button>
-    <div class="select-guest--modal">
-      <div class="guest">
-        <div class="guest--name">
-          Взрослые
+    <transition :name="'modal-guest-'+viewPort">
+      <div class="modal" :class="viewPort" v-if="modal">
+        <div class="modal--header" v-if="viewPort == 'mobile'">
+          <div class="modal--close" @click="close"></div>
+          Выбор гостей
         </div>
-        <div class="guest--count">
-          <button @click="adultsBtn('minus')" class="minus"></button>
-          <input type="number" min="1" v-model="guest.adults">
-          <button @click="adultsBtn('plus')" class="plus"></button>
+        <div class="modal--body">
+          <div class="select-guest--modal">
+            <div class="guest">
+              <div class="guest--name">
+                Взрослые
+              </div>
+              <div class="guest--count">
+                <button @click="adultsBtn('minus')" class="minus"></button>
+                <input type="number" min="1" v-model="guest.adults" @input="changeAdults" @keypress="isNumber($event)">
+                <button @click="adultsBtn('plus')" class="plus"></button>
+              </div>
+            </div>
+            <div class="guest">
+              <div class="guest--name">
+                Дети до 17 лет
+              </div>
+              <div class="guest--count">
+                <button @click="childrensBtn('minus')" class="minus"></button>
+                <input type="number" min="0" :max="maxChildrens" v-model="countChildrens" @keypress="isNumber($event)" placeholder="0">
+                <button @click="childrensBtn('plus')" class="plus"></button>
+              </div>
+            </div>
+            <div class="childrens" v-if="countChildrens">
+              <div class="childrens--name">Возраст детей:</div>
+              <div class="childrens--count">
+                <select
+                  v-for="(item, index) in +countChildrens"
+                  :key="index"
+                  v-model="guest.childrens[index]"
+                >
+                  <option
+                    v-for="child in 17"
+                    :value="child"
+                    :key="child"
+                    :selected="guest.childrens[index] == child"
+                  >
+                    {{ child }}
+                  </option>
+                </select>
+              </div>
+            </div>
+          </div>
+        </div>
+        <div class="modal--footer" v-if="viewPort == 'mobile'">
+          <button @click="close">
+            Ок
+          </button>
         </div>
       </div>
-      <div class="guest">
-        <div class="guest--name">
-          Дети до 17 лет
-        </div>
-        <div class="guest--count">
-          <button @click="childrensBtn('minus')" class="minus"></button>
-          <input type="number" min="0" max="30" v-model="guest.childrens.length">
-          <button @click="childrensBtn('plus')" class="plus"></button>
-        </div>
-      </div>
-      <div class="childrens" v-if="guest.childrens.length">
-        <div class="childrens--name">Возраст детей:</div>
-        <div class="childrens--count">
-          <select
-              v-for="(item, index) in guest.childrens.length"
-              :key="index"
-              v-model="guest.childrens[index]"
-          >
-            <option
-              v-for="child in 17"
-              :value="child"
-              :key="child"
-              :selected="guest.childrens[index] == child"
-            >
-              {{ child }}
-            </option>
-          </select>
-        </div>
-      </div>
-    </div>
+    </transition>
   </div>
 </template>
 
 <script>
+  import _ from "lodash";
+
   export default {
     name: "BaseSelectGuest",
     data() {
@@ -56,15 +74,56 @@
         guest: {
           adults: 1,
           childrens: []
-        }
+        },
+        countChildrens: 0,
+        maxChildrens: 9,
+        modal: true,
+        viewPort: "desktop"
+      }
+    },
+    created() {
+      if (localStorage.getItem("select_guest") !== null) {
+        this.guest = JSON.parse(localStorage.getItem("select_guest")).guest;
+        this.countChildrens = JSON.parse(localStorage.getItem("select_guest")).guest.childrens.length;
       }
     },
     computed: {
       allGuest() {
-        return +this.guest.adults + this.guest.childrens.length;
+        return +this.guest.adults + +this.countChildrens;
+      }
+    },
+    watch: {
+      'guest.adults'() {
+        this.saveLocalStorage();
+      },
+      'guest.childrens'() {
+        this.saveLocalStorage();
+      },
+      countChildrens(val) {
+        if (+val > 9) {
+          this.countChildrens = 9;
+        }
+
+        if (this.guest.childrens.length+1 == +val || +val > this.guest.childrens.length) {
+          this.guest.childrens = Array.from({length: +val}, (v, k) => 1);
+        } else {
+          this.guest.childrens.splice(val, this.guest.childrens.length - val);
+        }
+      },
+      modal(val) {
+        if (val == true && this.viewPort == "mobile") {
+          document.body.style.overflow = "hidden";
+        } else {
+          document.body.style.overflow = "";
+        }
       }
     },
     methods: {
+      changeAdults:_.debounce(function() {
+        if (this.guest.adults == "") {
+          this.guest.adults = 1;
+        }
+      }, 500),
       adultsBtn(val) {
         if (val == "minus") {
           this.guest.adults--
@@ -77,13 +136,39 @@
       },
       childrensBtn(val) {
         if (val == "minus") {
-          if (this.guest.childrens.length > 0) {
-            this.guest.childrens.pop();
+          this.countChildrens--
+          if (this.countChildrens <= 0) {
+            this.countChildrens = 0;
           }
         } else if (val == "plus") {
-          if (this.guest.childrens.length < 30) {
-            this.guest.childrens.push(1);
+          if (this.countChildrens < this.maxChildrens) {
+            this.countChildrens++
           }
+        }
+        this.saveLocalStorage();
+      },
+      saveLocalStorage() {
+        localStorage.setItem(
+          "select_guest",
+          JSON.stringify({
+            guest: this.guest
+          })
+        );
+      },
+      close() {
+        this.modal = false;
+      },
+      isNumber: function(evt) {
+        evt = evt ? evt : window.event;
+        let charCode = evt.which ? evt.which : evt.keyCode;
+        if (
+          charCode > 31 &&
+          (charCode < 48 || charCode > 57) &&
+          charCode !== 46
+        ) {
+          evt.preventDefault();
+        } else {
+          return true;
         }
       }
     }
@@ -91,6 +176,92 @@
 </script>
 
 <style lang="scss" scoped>
+.modal-guest-mobile-enter-active,
+.modal-guest-mobile-leave-active {
+  transform: translateX(0%);
+  transition: transform 0.35s ease;
+}
+.modal-guest-mobile-enter,
+.modal-guest-mobile-leave-to {
+  transform: translateX(100%);
+}
+.modal {
+  &.mobile {
+    position: fixed;
+    top: 0;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    z-index: 100;
+    background: #fff;
+    display: flex;
+    flex-direction: column;
+  }
+  &--header {
+    background: #444444;
+    color: #ffffff;
+    font-size: 17px;
+    position: relative;
+    height: 50px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+  }
+  &--body {
+    flex: auto;
+  }
+  &--footer {
+    padding: 10px;
+    button {
+      display: block;
+      outline-style: none;
+      padding: 8px 20px;
+      margin: 0;
+      text-align: center;
+      color: #ffffff;
+      font-size: 14px;
+      background: #498BC3;
+      border: 1px solid rgba(0, 0, 0, 0.15);
+      border-radius: 3px;
+      width: 100%;
+    }
+  }
+  &--close {
+    position: absolute;
+    font-size: 64px;
+    line-height: 40px;
+    width: 28px;
+    height: 50px;
+    transform: scale(0.7);
+    cursor: pointer;
+    top: 0;
+    left: 10px;
+    padding-left: 12px;
+    &::before,
+    &::after {
+      content: "";
+      background-color: white;
+      width: 4px;
+      height: 20px;
+      display: inline-block;
+    }
+    &::before {
+      transform: rotate(45deg) translate(-6px, -10px);
+      transform-origin: 100% 50%;
+    }
+    &::after {
+      transform: rotate(-45deg);
+      transform-origin: 0% 50%;
+    }
+  }
+  &.mobile {
+    .select-guest--modal {
+      position: static;
+      margin: 0;
+      width: 100%;
+    }
+  }
+}
 .select-guest {
   position: relative;
   display: inline-block;
@@ -229,6 +400,8 @@
       &--count {
         display: flex;
         flex-wrap: wrap;
+        width: 100%;
+        max-width: 230px;
         select {
           display: block;
           outline-style: none;
