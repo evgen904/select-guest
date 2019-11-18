@@ -1,6 +1,5 @@
 <template>
-  <div class="select-guest">
-    <!--v-click-outside="close"-->
+  <div class="select-guest" v-click-outside="close">
     <button class="select-guest--btn" @click="modal = !modal">
       {{ allGuest }} гостя
       <span class="ico-arrow" :class="{'active': modal}"></span>
@@ -77,7 +76,7 @@
         },
         countChildrens: 0,
         maxChildrens: 9,
-        modal: true,
+        modal: false,
         viewPort: "desktop"
       }
     },
@@ -100,14 +99,18 @@
         this.saveLocalStorage();
       },
       countChildrens(val) {
-        if (+val > 9) {
+        let thisVal = +val;
+        if (thisVal > 9) {
           this.countChildrens = 9;
         }
-
-        if (this.guest.childrens.length+1 == +val || +val > this.guest.childrens.length) {
-          this.guest.childrens = Array.from({length: +val}, (v, k) => 1);
+        if (this.guest.childrens.length+1 == thisVal || thisVal > this.guest.childrens.length) {
+          for (let i = 0; i < thisVal; i++) {
+            if (this.guest.childrens[i] === undefined) {
+              this.guest.childrens.push(1);
+            }
+          }
         } else {
-          this.guest.childrens.splice(val, this.guest.childrens.length - val);
+          this.guest.childrens.splice(thisVal, this.guest.childrens.length - thisVal);
         }
       },
       modal(val) {
@@ -185,6 +188,16 @@
 .modal-guest-mobile-leave-to {
   transform: translateX(100%);
 }
+
+
+.modal-guest-desktop-enter-active, .modal-guest-desktop-leave-active {
+  transition: opacity .2s;
+}
+.modal-guest-desktop-enter, .modal-guest-desktop-leave-to {
+  opacity: 0;
+}
+
+
 .modal {
   &.mobile {
     position: fixed;
