@@ -19,17 +19,17 @@
               <div class="guest--count">
                 <button @click="adultsBtn('minus')" class="minus"></button>
                 <input type="number" min="1" v-model="guest.adults" @input="changeAdults" @keypress="isNumber($event)">
-                <button @click="adultsBtn('plus')" class="plus"></button>
+                <button @click="adultsBtn('plus')" class="plus" :class="{'disabled':allGuest >= maxGuest}"></button>
               </div>
             </div>
-            <div class="guest">
+            <div class="guest" :class="{'disabled':maxGuest == 1}">
               <div class="guest--name">
                 Дети до 17 лет
               </div>
               <div class="guest--count">
                 <button @click="childrensBtn('minus')" class="minus"></button>
-                <input type="number" min="0" :max="maxChildrens" v-model="countChildrens" @keypress="isNumber($event)" placeholder="0">
-                <button @click="childrensBtn('plus')" class="plus"></button>
+                <input type="text" maxlength="1" v-model="countChildrens" @input="changeChildrens" @keypress="isNumber($event)" placeholder="0">
+                <button @click="childrensBtn('plus')" class="plus" :class="{'disabled':allGuest >= maxGuest}"></button>
               </div>
             </div>
             <div class="childrens" v-if="countChildrens">
@@ -68,22 +68,38 @@
 
   export default {
     name: "BaseSelectGuest",
+    props: {
+      maxGuest: {
+        type: Number
+      }
+    },
     data() {
       return {
         guest: {
           adults: 1,
           childrens: []
         },
-        countChildrens: 0,
+        countChildrens: "",
         maxChildrens: 9,
-        modal: false,
+        modal: true,
         viewPort: "desktop"
       }
     },
-    created() {
+    mounted() {
       if (localStorage.getItem("select_guest") !== null) {
-        this.guest = JSON.parse(localStorage.getItem("select_guest")).guest;
-        this.countChildrens = JSON.parse(localStorage.getItem("select_guest")).guest.childrens.length;
+        let dataLocalGuest = JSON.parse(localStorage.getItem("select_guest")).guest;
+        let countGuestLocal = dataLocalGuest.adults + dataLocalGuest.childrens.length;
+
+        if (this.maxGuest < countGuestLocal) {
+          this.guest = {
+            adults: 1,
+            childrens: []
+          };
+          this.countChildrens = "";
+        } else {
+          this.guest = dataLocalGuest;
+          this.countChildrens = (dataLocalGuest.childrens.length) ? dataLocalGuest.childrens.length : "";
+        }
       }
     },
     computed: {
@@ -126,7 +142,20 @@
         if (this.guest.adults == "") {
           this.guest.adults = 1;
         }
+        if (this.guest.adults > this.maxGuest) {
+          this.guest.adults = this.maxGuest - this.guest.childrens.length;
+        }
       }, 500),
+      changeChildrens() {
+        if (+this.countChildrens == 0) {
+          this.countChildrens = "";
+        }
+        if (this.maxGuest) {
+          if (+this.countChildrens > this.maxGuest-this.guest.adults) {
+            this.countChildrens = this.maxGuest-this.guest.adults;
+          }
+        }
+      },
       adultsBtn(val) {
         if (val == "minus") {
           this.guest.adults--
@@ -157,6 +186,7 @@
             guest: this.guest
           })
         );
+        this.$emit("input", this.allGuest)
       },
       close() {
         this.modal = false;
@@ -342,6 +372,10 @@
       align-items: center;
       height: 52px;
       padding: 0 20px;
+      &.disabled {
+        opacity: 0.5;
+        pointer-events: none;
+      }
       &--name {
         font-size: 15px;
         color: #444444;
@@ -378,6 +412,10 @@
               left: 8px;
               background: #999;
             }
+          }
+          &.disabled {
+            opacity: 0.5;
+            pointer-events: none;
           }
         }
         input[type="text"], input[type="number"] {
